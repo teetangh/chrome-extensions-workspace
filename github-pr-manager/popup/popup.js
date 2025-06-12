@@ -138,6 +138,7 @@ class PopupManager {
 
       this.updateStatus('extracting', 'Preparing download...');
       this.downloadBtn.disabled = true;
+      this.downloadBtn.classList.add('loading');
       
       // Apply user options to filter data
       const filteredData = this.applyUserOptions(this.extractedData);
@@ -147,20 +148,75 @@ class PopupManager {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const filename = `github-pr-${prNumber}-${timestamp}.json`;
       
-      // Send to background script for download
-      await chrome.runtime.sendMessage({
-        action: 'downloadPRReport',
-        data: filteredData,
-        filename: filename
-      });
+      console.log('Initiating download with filename:', filename);
       
-      this.updateStatus('ready', 'Download started');
+      try {
+        // Try service worker download first
+        const response = await chrome.runtime.sendMessage({
+          action: 'downloadPRReport',
+          data: filteredData,
+          filename: filename
+        });
+        
+        if (response.success) {
+          this.updateStatus('ready', `Download started (ID: ${response.downloadId})`);
+          console.log('Download successful with ID:', response.downloadId);
+          
+          // Show success message for a moment
+          setTimeout(() => {
+            this.updateStatus('ready', 'Ready for next extraction');
+          }, 3000);
+        } else {
+          throw new Error(response.error || 'Service worker download failed');
+        }
+      } catch (serviceWorkerError) {
+        console.warn('Service worker download failed, trying fallback:', serviceWorkerError);
+        
+        // Fallback: Download directly from popup
+        this.updateStatus('extracting', 'Using fallback download...');
+        await this.downloadReportFallback(filteredData, filename);
+        
+        this.updateStatus('ready', 'Download completed (fallback method)');
+        setTimeout(() => {
+          this.updateStatus('ready', 'Ready for next extraction');
+        }, 3000);
+      }
+      
     } catch (error) {
       console.error('Error downloading report:', error);
-      this.updateStatus('error', 'Download failed');
-      this.showErrorMessage('Failed to download report. Please try again.');
+      this.updateStatus('error', `Download failed: ${error.message}`);
+      this.showErrorMessage(`Failed to download report: ${error.message}`);
     } finally {
       this.downloadBtn.disabled = false;
+      this.downloadBtn.classList.remove('loading');
+    }
+  }
+
+  // Fallback download method that works directly in popup context
+  async downloadReportFallback(data, filename) {
+    try {
+      // Create JSON blob
+      const jsonString = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      
+      console.log('Fallback download completed');
+    } catch (error) {
+      console.error('Fallback download failed:', error);
+      throw new Error(`Fallback download failed: ${error.message}`);
     }
   }
 
@@ -188,6 +244,13 @@ class PopupManager {
   showErrorMessage(message) {
     // You could implement a toast notification or modal here
     console.error(message);
+    
+    // Update status to show error for longer
+    setTimeout(() => {
+      if (this.statusText.textContent.includes('failed')) {
+        this.updateStatus('ready', 'Ready for next extraction');
+      }
+    }, 5000);
   }
 
   async saveOptions() {
