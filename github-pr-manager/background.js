@@ -5,55 +5,75 @@ chrome.runtime.onInstalled.addListener(() => {
 
 // Handle messages from content scripts and popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'downloadPRReport') {
-    handleDownloadReport(request.data, request.filename)
-      .then(result => {
-        sendResponse({ success: true, downloadId: result.downloadId });
+  console.log('Received message:', request.action);
+  
+  if (request.action === 'download' || request.action === 'downloadPRReport') {
+    // Return true to indicate we will send a response asynchronously
+    downloadPRData(request.data, request.filename)
+      .then((downloadId) => {
+        console.log('Download successful, ID:', downloadId);
+        sendResponse({ success: true, downloadId: downloadId });
       })
-      .catch(error => {
-        console.error('Download error:', error);
-        sendResponse({ success: false, error: error.message });
+      .catch((error) => {
+        console.error('Download error details:', error);
+        // Better error serialization
+        const errorMessage = error.message || error.toString() || 'Unknown download error';
+        const errorDetails = {
+          message: errorMessage,
+          name: error.name,
+          stack: error.stack
+        };
+        console.error('Serialized error:', errorDetails);
+        sendResponse({ success: false, error: errorMessage, details: errorDetails });
       });
-    return true; // Keep message channel open for async response
+    
+    // Return true to keep the message channel open for async response
+    return true;
   } else if (request.action === 'getPRData') {
     // This will be handled by content script
     sendResponse({ success: true });
   }
 });
 
-// Handle downloading the PR report
-async function handleDownloadReport(data, filename) {
+// Function to handle downloads in Manifest V3
+async function downloadPRData(data, filename) {
   try {
-    console.log('Starting download process...', filename);
+    console.log('Starting download process...');
+    console.log('Filename:', filename);
+    console.log('Data size:', JSON.stringify(data).length, 'characters');
     
-    // Create JSON string with proper formatting
+    // Validate inputs
+    if (!data) {
+      throw new Error('No data provided for download');
+    }
+    
+    if (!filename) {
+      filename = 'github-pr-data.json';
+    }
+    
+    // Convert data to JSON string
     const jsonString = JSON.stringify(data, null, 2);
-    console.log('JSON data size:', jsonString.length);
+    console.log('JSON string created, length:', jsonString.length);
     
-    // Create blob
-    const blob = new Blob([jsonString], { 
-      type: 'application/json'
-    });
-    console.log('Blob created:', blob.size, 'bytes');
+    // Create data URL with proper encoding
+    const dataUrl = 'data:application/json;charset=utf-8,' + encodeURIComponent(jsonString);
+    console.log('Data URL created, length:', dataUrl.length);
     
-    // Create object URL
-    const url = URL.createObjectURL(blob);
-    console.log('Object URL created:', url);
+    // Check if data URL is too large (Chrome has limits)
+    if (dataUrl.length > 2 * 1024 * 1024) { // 2MB limit
+      throw new Error('Data too large for download (>2MB). Try reducing the amount of data.');
+    }
     
-    // Generate safe filename
-    const safeFilename = filename ? filename.replace(/[^a-z0-9.-]/gi, '_') : 'github-pr-report.json';
-    console.log('Using filename:', safeFilename);
-    
-    // Attempt download
+    // Use chrome.downloads API to download the file
+    console.log('Initiating chrome.downloads.download...');
     const downloadId = await new Promise((resolve, reject) => {
       chrome.downloads.download({
-        url: url,
-        filename: safeFilename,
-        saveAs: true,
-        conflictAction: 'uniquify'
+        url: dataUrl,
+        filename: filename,
+        saveAs: true
       }, (downloadId) => {
         if (chrome.runtime.lastError) {
-          console.error('Chrome download error:', chrome.runtime.lastError);
+          console.error('Chrome runtime error:', chrome.runtime.lastError);
           reject(new Error(chrome.runtime.lastError.message));
         } else {
           console.log('Download initiated successfully with ID:', downloadId);
@@ -62,20 +82,10 @@ async function handleDownloadReport(data, filename) {
       });
     });
     
-    // Clean up the object URL after a delay
-    setTimeout(() => {
-      try {
-        URL.revokeObjectURL(url);
-        console.log('Object URL cleaned up');
-      } catch (e) {
-        console.warn('Failed to revoke object URL:', e);
-      }
-    }, 5000);
-    
-    return { downloadId, success: true };
+    return downloadId;
     
   } catch (error) {
-    console.error('Download failed:', error);
+    console.error('downloadPRData error:', error);
     throw error;
   }
 }
@@ -101,6 +111,13 @@ chrome.downloads.onChanged.addListener((delta) => {
   console.log('Download changed:', delta);
   if (delta.error) {
     console.error('Download error occurred:', delta.error);
+    // Try to get more details about the error
+    if (typeof delta.error === 'object') {
+      console.error('Error details:', JSON.stringify(delta.error, null, 2));
+    }
+  }
+  if (delta.state && delta.state.current === 'complete') {
+    console.log('Download completed successfully');
   }
 });
 

@@ -152,13 +152,16 @@ class PopupManager {
       
       try {
         // Try service worker download first
+        console.log('Sending download message to background script...');
         const response = await chrome.runtime.sendMessage({
           action: 'downloadPRReport',
           data: filteredData,
           filename: filename
         });
         
-        if (response.success) {
+        console.log('Received response from background script:', response);
+        
+        if (response && response.success) {
           this.updateStatus('ready', `Download started (ID: ${response.downloadId})`);
           console.log('Download successful with ID:', response.downloadId);
           
@@ -167,10 +170,13 @@ class PopupManager {
             this.updateStatus('ready', 'Ready for next extraction');
           }, 3000);
         } else {
-          throw new Error(response.error || 'Service worker download failed');
+          const errorMsg = response ? (response.error || 'Service worker download failed') : 'No response from background script';
+          console.error('Background script error:', response);
+          throw new Error(errorMsg);
         }
       } catch (serviceWorkerError) {
         console.warn('Service worker download failed, trying fallback:', serviceWorkerError);
+        console.warn('Error details:', serviceWorkerError.message);
         
         // Fallback: Download directly from popup
         this.updateStatus('extracting', 'Using fallback download...');
