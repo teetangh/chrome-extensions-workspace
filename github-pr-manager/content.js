@@ -250,11 +250,12 @@ class GitHubPRExtractor {
         const linkElement = element.querySelector('a[href*="#diff-"]') ||
                            element.closest('a[href*="#diff-"]');
         if (linkElement) {
-          const href = linkElement.getAttribute('href');
-          const match = href.match(/\/([^\/]+\.[^\/]+)#/);
-          if (match) {
-            filePath = match[1];
+          const linkText = linkElement.textContent?.trim();
+          // Prioritize textContent if it looks like a file path and isn't a generic action text
+          if (linkText && (linkText.includes('/') || linkText.includes('.')) && !/^(View|Expand|Collapse)/i.test(linkText)) {
+            filePath = linkText;
           }
+          // The old regex method of parsing href is removed as textContent is more reliable here based on sample.html.
         }
       }
       
