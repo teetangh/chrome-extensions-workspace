@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>GitHub PR Manager</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>GitHub PR Manager</h1>
+      <div class="version">v1.0.0</div>
+    </header>
+    
+    <div class="status-section">
+      <div id="status" class="status-indicator">
+        <span class="status-icon">⚪</span>
+        <span id="status-text">Ready</span>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <div class="info-section">
+        <h3>Current Page</h3>
+        <div id="page-info" class="page-info">
+          <span id="page-url">Detecting...</span>
+        </div>
+      </div>
+
+      <div class="actions-section">
+        <button id="extract-btn" class="btn btn-primary" disabled>
+          <span class="btn-icon">📊</span>
+          Extract PR Data
+        </button>
+        
+        <button id="download-btn" class="btn btn-secondary" disabled>
+          <span class="btn-icon">💾</span>
+          Download Report
+        </button>
+      </div>
+
+      <div class="preview-section" id="preview-section" style="display: none;">
+        <h3>Data Preview</h3>
+        <div class="preview-stats">
+          <div class="stat-item">
+            <span class="stat-label">Files:</span>
+            <span id="files-count">-</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Comments:</span>
+            <span id="comments-count">-</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Reviews:</span>
+            <span id="reviews-count">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="options-section">
+      <details>
+        <summary>Options</summary>
+        <div class="options-content">
+          <label class="checkbox-label">
+            <input type="checkbox" id="include-file-changes" checked>
+            <span class="checkmark"></span>
+            Include file changes
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="include-inline-comments" checked>
+            <span class="checkmark"></span>
+            Include inline comments
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="format-json" checked>
+            <span class="checkmark"></span>
+            Format JSON output
+          </label>
+        </div>
+      </details>
+    </div>
+
+    <div class="help-section">
+      <details>
+        <summary>Help</summary>
+        <div class="help-content">
+          <p><strong>How to use:</strong></p>
+          <ol>
+            <li>Navigate to a GitHub pull request page</li>
+            <li>Click "Extract PR Data" to collect information</li>
+            <li>Review the data preview</li>
+            <li>Click "Download Report" to save as JSON</li>
+          </ol>
+          <p><strong>Supported data:</strong></p>
+          <ul>
+            <li>PR metadata (title, author, state, etc.)</li>
+            <li>File changes and line modifications</li>
+            <li>General and inline comments</li>
+            <li>Review statuses and feedback</li>
+          </ul>
+        </div>
+      </details>
+    </div>
+
+    <footer>
+      <div class="footer-links">
+        <a href="#" id="github-link">View on GitHub</a>
+        <span class="separator">•</span>
+        <a href="#" id="report-issue">Report Issue</a>
+      </div>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html> 
